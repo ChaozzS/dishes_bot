@@ -12,7 +12,7 @@ from telegram.ext import (
 )
 from telegram.ext import HTTPXRequest
 from dotenv import load_dotenv
-
+from flask import Flask, send_from_directory
 # ─── ЗАВАНТАЖЕННЯ НАЛАШТУВАНЬ ──────────────────────────────────────────────────
 load_dotenv()
 TOKEN       = os.getenv("TELEGRAM_TOKEN")
@@ -36,6 +36,13 @@ application = (
 )
 
 # ─── ХЕНДЛЕР /start ──────────────────────────────────────────────────────────
+
+app = Flask(__name__)
+@app.route("/menu")
+def menu():
+    return send_from_directory("static", "menu.html")
+app.run(host="0.0.0.0", port=8080)
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [
