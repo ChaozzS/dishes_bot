@@ -20,9 +20,7 @@ MENU = {
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Команда /start: приветствие и главное меню"""
-    keyboard = []
-    for category in MENU.keys():
-        keyboard.append([InlineKeyboardButton(category, callback_data=f"cat|{category}")])
+    keyboard = [[InlineKeyboardButton(cat, callback_data=f"cat|{cat}")] for cat in MENU]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
         'Привет! Выберите категорию блюда:',
@@ -35,23 +33,10 @@ async def handle_menu_selection(update: Update, context: ContextTypes.DEFAULT_TY
     await query.answer()
 
     data = query.data.split('|')
-    level = data[0]  # 'cat' или 'item'
-
-    if level == 'cat':
-        # Показать подкатегории для выбранной категории
+    if data[0] == 'cat':
         category = data[1]
-        keyboard = []
-        for item in MENU[category]:
-            keyboard.append([
-                InlineKeyboardButton(
-                    item,
-                    callback_data=f"item|{category}|{item}"
-                )
-            ])
-        # Кнопка назад в главное меню
-        keyboard.append([
-            InlineKeyboardButton('⬅️ Назад', callback_data='back')
-        ])
+        keyboard = [[InlineKeyboardButton(item, callback_data=f"item|{category}|{item}")] for item in MENU[category]]
+        keyboard.append([InlineKeyboardButton('⬅️ Назад', callback_data='back')])
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
             text=f'Вы выбрали *{category}*. Теперь выберите блюдо:',
@@ -59,10 +44,8 @@ async def handle_menu_selection(update: Update, context: ContextTypes.DEFAULT_TY
             parse_mode='Markdown'
         )
 
-    elif level == 'item':
-        # Пользователь выбрал конкретное блюдо -> отправка админу
-        category = data[1]
-        item = data[2]
+    elif data[0] == 'item':
+        category, item = data[1], data[2]
         user = query.from_user
         order_text = (
             f"📬 *Новый заказ*\n"
@@ -70,47 +53,40 @@ async def handle_menu_selection(update: Update, context: ContextTypes.DEFAULT_TY
             f"Категория: {category}\n"
             f"Блюдо: {item}"
         )
-        # Пересылаем админу
         await context.bot.send_message(
             chat_id=ADMIN_CHAT_ID,
             text=order_text,
             parse_mode='Markdown'
         )
-        # Уведомляем пользователя
         await query.edit_message_text(
             text=f'✅ Ваш заказ *{item}* отправлен!',
             parse_mode='Markdown'
         )
 
     elif query.data == 'back':
-        # Возврат к главному меню
-        keyboard = []
-        for category in MENU.keys():
-            keyboard.append([
-                InlineKeyboardButton(category, callback_data=f"cat|{category}")
-            ])
+        keyboard = [[InlineKeyboardButton(cat, callback_data=f"cat|{cat}")] for cat in MENU]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
             text='Выберите категорию блюда:',
             reply_markup=reply_markup
         )
 
-async def main():
+# Основная функция теперь обычная, а не асинхронная
+def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
-    # Команда /start
+    # Регистрируем обработчики
     app.add_handler(CommandHandler('start', start))
-    # Обработка нажатий кнопок
     app.add_handler(CallbackQueryHandler(handle_menu_selection))
 
-    # Запуск polling (для Railway можно использовать webhook)
+    # Запуск polling или webhook в зависимости от окружения
     if os.environ.get('RAILWAY'):
-        # Настройка webhook, если развернуто на Railway
         WEBHOOK_URL = os.environ['WEBHOOK_URL']
+        PORT = int(os.environ.get('PORT', '8443'))
         app.run_webhook(
             listen='0.0.0.0',
-            port=int(os.environ.get('PORT', '8443')),
-            webhook_url=WEBHOOK_URL + TOKEN
+            port=PORT,
+            webhook_url=f"{WEBHOOK_URL}{TOKEN}"
         )
     else:
         app.run_polling()
