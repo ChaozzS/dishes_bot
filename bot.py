@@ -2,40 +2,49 @@ import os
 import json
 from flask import Flask, request, send_from_directory
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
-from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters,
+)
 from dotenv import load_dotenv
 import asyncio
 
+# Завантаження .env
 load_dotenv()
-
 TOKEN = os.getenv("TELEGRAM_TOKEN")
-WEBAPP_URL = os.getenv("WEBAPP_URL")
+WEBAPP_URL = os.getenv("WEBAPP_URL")  # https://web-....railway.app
 
-app = Application.builder().token(TOKEN).build()
+# Ініціалізація телеграм-додатку
+application = Application.builder().token(TOKEN).build()
+
+# Ініціалізація Flask
 flask_app = Flask(__name__)
 
-# HTML меню
-@flask_app.route("/menu")
-def menu():
-    return send_from_directory("static", "menu.html")
+# === Flask Routes ===
 
-# коренева сторінка
 @flask_app.route("/")
 def index():
-    return "✅ Telegram Webhook бот працює!", 200
+    return "✅ Bot is running!"
 
-# Webhook точка прийому
+@flask_app.route("/menu")
+def serve_menu():
+    return send_from_directory("static", "menu.html")
+
 @flask_app.route(f"/{TOKEN}", methods=["POST"])
-def webhook():
+def telegram_webhook():
     try:
-        update = Update.de_json(request.get_json(force=True), app.bot)
-        app.create_task(app.process_update(update))  # запускає обробку асинхронно
-        return "ok", 200
+        update = Update.de_json(request.get_json(force=True), application.bot)
+        application.create_task(application.process_update(update))
+        return "ok"
     except Exception as e:
-        print("❌ Помилка обробки webhook:", e)
+        print("❌ Webhook Error:", e)
         return "error", 500
 
-# /start
+# === Telegram Handlers ===
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("📋 Відкрити меню", web_app=WebAppInfo(url=f"{WEBAPP_URL}/menu"))]
@@ -43,23 +52,23 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("Натисни кнопку нижче, щоб відкрити меню:", reply_markup=reply_markup)
 
-# вибір страви
 async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         data = json.loads(update.message.web_app_data.data)
         dish = data.get("dish")
         await context.bot.send_message(chat_id=update.effective_chat.id, text=f"🍽️ Ви обрали: {dish}")
     except Exception as e:
-        print("❌ Помилка при обробці WebAppData:", e)
+        print("❌ WebAppData Error:", e)
 
-# реєстрація обробників
-app.add_handler(CommandHandler("start", start))
-app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_webapp_data))
+# Реєстрація хендлерів
+application.add_handler(CommandHandler("start", start))
+application.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_webapp_data))
 
-# запуск
+# === Запуск ===
+
 if __name__ == "__main__":
     async def main():
-        await app.bot.set_webhook(url=f"{WEBAPP_URL}/{TOKEN}")
+        await application.bot.set_webhook(f"{WEBAPP_URL}/{TOKEN}")
         print(f"📡 Webhook встановлено: {WEBAPP_URL}/{TOKEN}")
         flask_app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
 
