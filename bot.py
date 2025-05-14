@@ -22,13 +22,15 @@ def serve_menu():
     return send_from_directory("static", "menu.html")
 
 @flask_app.route(f"/{TOKEN}", methods=["POST"])
-async def telegram_webhook():                        # <-- тепер async
+async def telegram_webhook():
     print("➡️  POST на Webhook")
-    payload = await request.get_json(force=True)     # <-- await
+    # Забираємо JSON без await, бо це не корутина
+    payload = request.get_json(force=True)
     print("Payload:", payload)
     update = Update.de_json(payload, application.bot)
     print("🆕 Update decoded:", update)
-    await application.process_update(update)         # <-- await
+    # Обробляємо оновлення асинхронно
+    await application.process_update(update)
     return "ok", 200
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
