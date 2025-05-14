@@ -1,73 +1,119 @@
-# bot.py
-
 import os
-import json
-import asyncio
-from aiohttp import web
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
-from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
-from dotenv import load_dotenv
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    CallbackQueryHandler,
+    ContextTypes,
+)
 
-# ─── Завантажуємо налаштування ────────────────────────────────────────────────
-load_dotenv := load_dotenv  # ця строка лиш для синтаксису демонстрації
-load_dotenv()
-TOKEN      = os.getenv("TELEGRAM_TOKEN")
-WEBAPP_URL = os.getenv("WEBAPP_URL")  # напр.: https://...railway.app
-PORT       = int(os.environ.get("PORT", 8080))
+# Загружаем токен и chat_id администратора из переменных окружения
+TOKEN = os.environ.get('TELEGRAM_TOKEN')
+ADMIN_CHAT_ID = int(os.environ.get('ADMIN_CHAT_ID', 0))
 
-# ─── Ініціалізуємо Telegram Application ──────────────────────────────────────
-application = Application.builder().token(TOKEN).build()
+# Структура меню: категории и подкатегории
+MENU = {
+    'Пицца': ['Маргарита', 'Пепперони', 'Гавайская'],
+    'Суши': ['Калифорния', 'Филадельфия', 'Дракон'],
+    'Напитки': ['Кола', 'Сок', 'Вода'],
+}
 
-# ─── Handlers ─────────────────────────────────────────────────────────────────
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Команда /start: приветствие и главное меню"""
+    keyboard = []
+    for category in MENU.keys():
+        keyboard.append([InlineKeyboardButton(category, callback_data=f"cat|{category}")])
+    reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
-        "Натисни кнопку нижче, щоб відкрити меню:",
-        reply_markup=InlineKeyboardMarkup(
-            [[InlineKeyboardButton("📋 Відкрити меню", web_app=WebAppInfo(f"{WEBAPP_URL}/menu"))]]
-        ),
+        'Привет! Выберите категорию блюда:',
+        reply_markup=reply_markup
     )
 
-async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    raw = update.message.web_app_data.data
-    dish = json.loads(raw).get("dish", "невідома страва")
-    await context.bot.send_message(
-        chat_id=update.effective_chat.id,
-        text=f"🍽️ Ви обрали: {dish}"
-    )
+async def handle_menu_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обрабатываем выбор категории или подкатегории"""
+    query = update.callback_query
+    await query.answer()
 
-application.add_handler(CommandHandler("start", start))
-application.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_webapp_data))
+    data = query.data.split('|')
+    level = data[0]  # 'cat' или 'item'
 
-# ─── aiohttp App ─────────────────────────────────────────────────────────────
-async def telegram_webhook(request):
-    data = await request.json()
-    update = Update.de_json(data, application.bot)
-    await application.process_update(update)
-    return web.Response(text="ok")
+    if level == 'cat':
+        # Показать подкатегории для выбранной категории
+        category = data[1]
+        keyboard = []
+        for item in MENU[category]:
+            keyboard.append([
+                InlineKeyboardButton(
+                    item,
+                    callback_data=f"item|{category}|{item}"
+                )
+            ])
+        # Кнопка назад в главное меню
+        keyboard.append([
+            InlineKeyboardButton('⬅️ Назад', callback_data='back')
+        ])
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(
+            text=f'Вы выбрали *{category}*. Теперь выберите блюдо:',
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
+        )
 
-# Статика для вашого menu.html
-async def serve_menu(request):
-    return web.FileResponse(path="static/menu.html")
+    elif level == 'item':
+        # Пользователь выбрал конкретное блюдо -> отправка админу
+        category = data[1]
+        item = data[2]
+        user = query.from_user
+        order_text = (
+            f"📬 *Новый заказ*\n"
+            f"Пользователь: @{user.username or user.id}\n"
+            f"Категория: {category}\n"
+            f"Блюдо: {item}"
+        )
+        # Пересылаем админу
+        await context.bot.send_message(
+            chat_id=ADMIN_CHAT_ID,
+            text=order_text,
+            parse_mode='Markdown'
+        )
+        # Уведомляем пользователя
+        await query.edit_message_text(
+            text=f'✅ Ваш заказ *{item}* отправлен!',
+            parse_mode='Markdown'
+        )
 
-app = web.Application()
-app.router.add_post(f"/{TOKEN}", telegram_webhook)
-app.router.add_get("/menu", serve_menu)
+    elif query.data == 'back':
+        # Возврат к главному меню
+        keyboard = []
+        for category in MENU.keys():
+            keyboard.append([
+                InlineKeyboardButton(category, callback_data=f"cat|{category}")
+            ])
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(
+            text='Выберите категорию блюда:',
+            reply_markup=reply_markup
+        )
 
-# ─── Стартуємо все в одному процесі ──────────────────────────────────────────
 async def main():
-    # 1) Ініціалізуємо бота
-    await application.initialize()
-    # 2) Скидаємо старі апдейти і встановлюємо Webhook
-    await application.bot.set_webhook(f"{WEBAPP_URL}/{TOKEN}", drop_pending_updates=True)
-    print(f"📡 Webhook встановлено: {WEBAPP_URL}/{TOKEN}")
-    # 3) Запускаємо aiohttp-сервер (статик + webhook)
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", PORT)
-    await site.start()
-    print(f"🌐 HTTP server запущено на порті {PORT}")
-    # і тримаємо цикл живим
-    await asyncio.Event().wait()
+    app = ApplicationBuilder().token(TOKEN).build()
 
-if __name__ == "__main__":
-    asyncio.run(main())
+    # Команда /start
+    app.add_handler(CommandHandler('start', start))
+    # Обработка нажатий кнопок
+    app.add_handler(CallbackQueryHandler(handle_menu_selection))
+
+    # Запуск polling (для Railway можно использовать webhook)
+    if os.environ.get('RAILWAY'):
+        # Настройка webhook, если развернуто на Railway
+        WEBHOOK_URL = os.environ['WEBHOOK_URL']
+        app.run_webhook(
+            listen='0.0.0.0',
+            port=int(os.environ.get('PORT', '8443')),
+            webhook_url=WEBHOOK_URL + TOKEN
+        )
+    else:
+        app.run_polling()
+
+if __name__ == '__main__':
+    main()
