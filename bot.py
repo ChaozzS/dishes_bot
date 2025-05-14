@@ -2,28 +2,16 @@ import os
 import json
 from flask import Flask, request, send_from_directory
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    MessageHandler,
-    ContextTypes,
-    filters,
-)
+from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 from dotenv import load_dotenv
 import asyncio
 
-# Завантаження .env
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_TOKEN")
-WEBAPP_URL = os.getenv("WEBAPP_URL")  # https://web-....railway.app
+WEBAPP_URL = os.getenv("WEBAPP_URL")
 
-# Ініціалізація телеграм-додатку
 application = Application.builder().token(TOKEN).build()
-
-# Ініціалізація Flask
 flask_app = Flask(__name__)
-
-# === Flask Routes ===
 
 @flask_app.route("/")
 def index():
@@ -43,8 +31,6 @@ def telegram_webhook():
         print("❌ Webhook Error:", e)
         return "error", 500
 
-# === Telegram Handlers ===
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("📋 Відкрити меню", web_app=WebAppInfo(url=f"{WEBAPP_URL}/menu"))]
@@ -60,11 +46,8 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
     except Exception as e:
         print("❌ WebAppData Error:", e)
 
-# Реєстрація хендлерів
 application.add_handler(CommandHandler("start", start))
 application.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_webapp_data))
-
-# === Запуск ===
 
 if __name__ == "__main__":
     async def main():
