@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="uk">
 <head>
@@ -7,81 +6,26 @@
   <title>Меню страв</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #f0f2f5;
-      margin: 0;
-      padding: 1rem;
-    }
-    h1 {
-      text-align: center;
-      margin-bottom: 1rem;
-    }
-    .category {
-      margin-bottom: 2rem;
-    }
-    .dish {
-      background: white;
-      border-radius: 12px;
-      padding: 1rem;
-      margin-bottom: 1rem;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    .dish img {
-      width: 100%;
-      border-radius: 10px;
-      margin-bottom: 0.5rem;
-    }
-    .dish h3 {
-      margin: 0.5rem 0;
-    }
-    .button {
-      background-color: #0088cc;
-      color: white;
-      padding: 0.75rem;
-      text-align: center;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      width: 100%;
-      font-size: 1rem;
-    }
-    .button:hover {
-      background-color: #0075b3;
-    }
+    body { font-family: Arial; padding: 1rem; background: #f4f4f4; }
+    .dish { background: #fff; padding: 1rem; border-radius: 10px; margin-bottom: 1rem; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    .button { background-color: #0088cc; color: white; padding: 10px; border: none; border-radius: 5px; width: 100%; }
   </style>
 </head>
 <body>
-  <h1>Меню страв</h1>
-
-  <div class="category">
-    <h2>Перша страва</h2>
-    <div class="dish">
-      <img src="https://via.placeholder.com/400x200.png?text=Борщ" alt="Борщ">
-      <h3>Борщ</h3>
-      <p><strong>Інгредієнти:</strong> Буряк, картопля, капуста, морква, м'ясо</p>
-      <p><strong>Рецепт:</strong> Зварити бульйон, додати овочі, томити 40 хвилин.</p>
-      <button class="button" onclick="sendDish('Борщ')">Замовити</button>
-    </div>
+  <h1>Меню</h1>
+  <div class="dish">
+    <h3>Борщ</h3>
+    <button class="button" onclick="sendDish('Борщ')">Замовити</button>
   </div>
-
-  <div class="category">
-    <h2>Друга страва</h2>
-    <div class="dish">
-      <img src="https://via.placeholder.com/400x200.png?text=Плов" alt="Плов">
-      <h3>Плов</h3>
-      <p><strong>Інгредієнти:</strong> Рис, морква, цибуля, м’ясо, спеції</p>
-      <p><strong>Рецепт:</strong> Обсмажити м’ясо, додати овочі, потім рис, варити під кришкою.</p>
-      <button class="button" onclick="sendDish('Плов')">Замовити</button>
-    </div>
+  <div class="dish">
+    <h3>Плов</h3>
+    <button class="button" onclick="sendDish('Плов')">Замовити</button>
   </div>
-
   <script>
-  function sendDish(dish) {
-    alert("Вибрано: " + dish); // ← допомагає побачити, чи працює JavaScript
-    Telegram.WebApp.sendData(JSON.stringify({ dish }));
-    Telegram.WebApp.close();
-  }
+    function sendDish(dish) {
+      Telegram.WebApp.sendData(JSON.stringify({ dish }));
+      Telegram.WebApp.close();
+    }
   </script>
 </body>
 </html>
