@@ -1,28 +1,19 @@
 <!DOCTYPE html>
 <html lang="uk">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Меню страв</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <style>
-    body { font-family: Arial; padding: 1rem; background: #f4f4f4; }
-    .dish { background: #fff; padding: 1rem; border-radius: 10px; margin-bottom: 1rem; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-    .button { background-color: #0088cc; color: white; padding: 10px; border: none; border-radius: 5px; width: 100%; }
-  </style>
 </head>
 <body>
   <h1>Меню</h1>
-  <div class="dish">
-    <h3>Борщ</h3>
-    <button class="button" onclick="sendDish('Борщ')">Замовити</button>
-  </div>
-  <div class="dish">
-    <h3>Плов</h3>
-    <button class="button" onclick="sendDish('Плов')">Замовити</button>
-  </div>
+  <button onclick="debugSend('Борщ')">Замовити Борщ</button>
+
   <script>
-    function sendDish(dish) {
+    function debugSend(dish) {
+      alert('🔔 Ви натиснули «Замовити»: ' + dish);
+      console.log('→ відправляю:', dish);
       Telegram.WebApp.sendData(JSON.stringify({ dish }));
       Telegram.WebApp.close();
     }
