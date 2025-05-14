@@ -10,16 +10,16 @@ from telegram.ext import (
     ContextTypes,
     filters,
 )
-from telegram.ext import HTTPXRequest
+from telegram.request import HTTPXRequest
 from dotenv import load_dotenv
-from flask import Flask, send_from_directory
-# ─── ЗАВАНТАЖЕННЯ НАЛАШТУВАНЬ ──────────────────────────────────────────────────
-load_dotenv()
-TOKEN       = os.getenv("TELEGRAM_TOKEN")
-WEBAPP_URL  = os.getenv("WEBAPP_URL")  # Напр.: https://your-project.up.railway.app
-PORT        = int(os.environ.get("PORT", 8080))
 
-# ─── НАЛАШТУВАННЯ HTTPXRequest (щоб уникнути PoolTimeout) ────────────────────
+# ── Налаштування ──────────────────────────────────────────────────────────────
+load_dotenv()
+TOKEN      = os.getenv("TELEGRAM_TOKEN")
+WEBAPP_URL = os.getenv("WEBAPP_URL")  # Наприклад: https://your-project.up.railway.app
+PORT       = int(os.environ.get("PORT", 8080))
+
+# ── HTTPXRequest для великого пулу з’єднань ────────────────────────────────────
 request = HTTPXRequest(
     connect_timeout=20.0,
     read_timeout=20.0,
@@ -27,7 +27,7 @@ request = HTTPXRequest(
     pool_timeout=30.0,
 )
 
-# ─── ІНІЦІАЛІЗАЦІЯ БОТА ───────────────────────────────────────────────────────
+# ── Ініціалізація бота ─────────────────────────────────────────────────────────
 application = (
     ApplicationBuilder()
     .token(TOKEN)
@@ -35,14 +35,7 @@ application = (
     .build()
 )
 
-# ─── ХЕНДЛЕР /start ──────────────────────────────────────────────────────────
-
-app = Flask(__name__)
-@app.route("/menu")
-def menu():
-    return send_from_directory("static", "menu.html")
-app.run(host="0.0.0.0", port=8080)
-
+# ── /start ────────────────────────────────────────────────────────────────────
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [
@@ -58,7 +51,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=reply_markup,
     )
 
-# ─── ХЕНДЛЕР WebAppData ─────────────────────────────────────────────────────
+# ── Обробка WebAppData ───────────────────────────────────────────────────────
 async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         raw = update.message.web_app_data.data
@@ -71,11 +64,11 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
     except Exception as e:
         print("❌ Помилка в handle_webapp_data:", e)
 
-# ─── РЕЄСТРАЦІЯ ХЕНДЛЕРІВ ────────────────────────────────────────────────────
+# ── Реєстрація хендлерів ───────────────────────────────────────────────────────
 application.add_handler(CommandHandler("start", start))
 application.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_webapp_data))
 
-# ─── СТАРТ WEBHOOK-СЕРВЕРА ───────────────────────────────────────────────────
+# ── Запуск Webhook ────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     application.run_webhook(
         listen="0.0.0.0",
