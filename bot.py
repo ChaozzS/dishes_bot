@@ -53,10 +53,17 @@ application.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle
 
 if __name__ == "__main__":
     import asyncio
+
     async def main():
-        # встановлюємо webhook
-        await application.bot.set_webhook(f"{WEBAPP_URL}/{TOKEN}")
-        print(f"📡 Webhook встановлено: {WEBAPP_URL}/{TOKEN}")
-        # запускаємо Flask (async views підтримуються завдяки Flask[async])
+        # 1) Ініціалізуємо Application (реєструємо всі хендлери, запускаємо internal job queue тощо)
+        await application.initialize()
+
+        # 2) Встановлюємо Webhook у Telegram
+        webhook_url = f"{WEBAPP_URL}/{TOKEN}"
+        await application.bot.set_webhook(webhook_url)
+        print(f"📡 Webhook встановлено: {webhook_url}")
+
+        # 3) Запускаємо Flask, щоб приймати оновлення
         flask_app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+
     asyncio.run(main())
