@@ -13,7 +13,7 @@ app_web = Flask(__name__)
 
 @app_web.route("/")
 def menu():
-    return send_from_directory("static", "menu.static")
+    return send_from_directory("static", "menu.html")
 
 def run_flask():
     app_web.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
