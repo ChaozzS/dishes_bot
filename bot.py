@@ -55,15 +55,13 @@ if __name__ == "__main__":
     import asyncio
 
     async def main():
-        # 1) Ініціалізуємо Application (реєструємо всі хендлери, запускаємо internal job queue тощо)
         await application.initialize()
 
-        # 2) Встановлюємо Webhook у Telegram
         webhook_url = f"{WEBAPP_URL}/{TOKEN}"
-        await application.bot.set_webhook(webhook_url)
-        print(f"📡 Webhook встановлено: {webhook_url}")
+        # скидаємо всі старі оновлення і відразу вішамо новий webhook
+        await application.bot.set_webhook(webhook_url, drop_pending_updates=True)
+        print(f"📡 Webhook встановлено (з обнуленням): {webhook_url}")
 
-        # 3) Запускаємо Flask, щоб приймати оновлення
         flask_app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
 
     asyncio.run(main())
