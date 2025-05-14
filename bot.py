@@ -2,7 +2,7 @@ import os
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 
-# Токен бота и ID администратора (жестко через переменные окружения или здесь)
+# Токен бота и ID администратора
 TOKEN = os.environ.get('TELEGRAM_TOKEN')
 ADMIN_CHAT_ID = int(os.environ.get('ADMIN_CHAT_ID', '123456789'))  # замените на ваш ID
 
@@ -27,7 +27,7 @@ INGREDIENTS = {
 }
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Команда /start: показываем главное меню категорий"""
+    """Команда /start: показываем меню категорий"""
     keyboard = [[InlineKeyboardButton(cat, callback_data=f"cat|{cat}")] for cat in MENU]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
@@ -41,8 +41,8 @@ async def handle_menu_selection(update: Update, context: ContextTypes.DEFAULT_TY
     await query.answer()
     data = query.data.split('|')
 
-    # Выбор категории
     if data[0] == 'cat':
+        # Показать блюда выбранной категории
         category = data[1]
         keyboard = [[InlineKeyboardButton(
             item, callback_data=f"item|{item}")
@@ -54,26 +54,28 @@ async def handle_menu_selection(update: Update, context: ContextTypes.DEFAULT_TY
             parse_mode='Markdown'
         )
 
-    # Выбор блюда
     elif data[0] == 'item':
+        # Пользователь выбрал блюдо -> отправляем название и ингредиенты владельцу
         item = data[1]
         ingredients = INGREDIENTS.get(item, [])
         ingredients_text = ', '.join(ingredients) if ingredients else 'Неизвестно'
         order_text = f"🍽 *{item}*\nИнгредиенты: {ingredients_text}"
-        # Пересылаем владельцу
+
+        # Отправляем владельцу
         await context.bot.send_message(
             chat_id=ADMIN_CHAT_ID,
             text=order_text,
             parse_mode='Markdown'
         )
-        # Уведомление пользователю
+        # Снова показываем главное меню пользователю
+        keyboard = [[InlineKeyboardButton(cat, callback_data=f"cat|{cat}")] for cat in MENU]
         await query.edit_message_text(
-            text='✅ Ваш заказ отправлен!',
-            parse_mode='Markdown'
+            text='✅ Ваш заказ отправлен! Выберите ещё блюдо:',
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
-    # Кнопка назад к выбору категории
     elif query.data == 'back':
+        # Вернуться к выбору категории
         keyboard = [[InlineKeyboardButton(cat, callback_data=f"cat|{cat}")] for cat in MENU]
         await query.edit_message_text(
             text='Выберите категорию блюда:',
@@ -83,10 +85,12 @@ async def handle_menu_selection(update: Update, context: ContextTypes.DEFAULT_TY
 
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
+
+    # Регистрируем обработчики
     app.add_handler(CommandHandler('start', start))
     app.add_handler(CallbackQueryHandler(handle_menu_selection))
 
-    # Запуск: polling или webhook для Railway
+    # Если используется webhook на Railway
     if os.environ.get('RAILWAY'):
         WEBHOOK_URL = os.environ['WEBHOOK_URL']
         PORT = int(os.environ.get('PORT', '8443'))
@@ -96,7 +100,8 @@ def main():
             webhook_url=f"{WEBHOOK_URL}{TOKEN}"
         )
     else:
-        app.run_polling()
+        # Удаляем вебхук, чтобы не было конфликта getUpdates
+        app.run_polling(drop_pending_updates=True)
 
 if __name__ == '__main__':
     main()
