@@ -2,62 +2,72 @@
 
 import os
 import json
-import threading
-from flask import Flask, send_from_directory
+import asyncio
+from aiohttp import web
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 from dotenv import load_dotenv
 
-# ─── Завантажуємо налаштування ───────────────────────────────────────────────
+# ─── Завантажуємо налаштування ────────────────────────────────────────────────
+load_dotenv := load_dotenv  # ця строка лиш для синтаксису демонстрації
 load_dotenv()
 TOKEN      = os.getenv("TELEGRAM_TOKEN")
-WEBAPP_URL = os.getenv("WEBAPP_URL")  # наприклад: https://your-project.up.railway.app
+WEBAPP_URL = os.getenv("WEBAPP_URL")  # напр.: https://...railway.app
 PORT       = int(os.environ.get("PORT", 8080))
 
-# ─── Flask для статики ────────────────────────────────────────────────────────
-flask_app = Flask(__name__, static_folder="static")
+# ─── Ініціалізуємо Telegram Application ──────────────────────────────────────
+application = Application.builder().token(TOKEN).build()
 
-@flask_app.route("/menu")
-def serve_menu():
-    return send_from_directory("static", "menu.html")
-
-def run_flask():
-    # Flask працює на тому ж порті, але ми підхопимо його в окремому потоці
-    flask_app.run(host="0.0.0.0", port=PORT)
-
-# ─── Ініціалізація Telegram-бота ─────────────────────────────────────────────
-application = ApplicationBuilder().token(TOKEN).build()
-
-# /start — надсилаємо кнопку WebApp
+# ─── Handlers ─────────────────────────────────────────────────────────────────
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        [InlineKeyboardButton("📋 Відкрити меню", web_app=WebAppInfo(f"{WEBAPP_URL}/menu"))]
-    ]
     await update.message.reply_text(
         "Натисни кнопку нижче, щоб відкрити меню:",
-        reply_markup=InlineKeyboardMarkup(keyboard)
+        reply_markup=InlineKeyboardMarkup(
+            [[InlineKeyboardButton("📋 Відкрити меню", web_app=WebAppInfo(f"{WEBAPP_URL}/menu"))]]
+        ),
     )
 
-# Обробка натискання в WebApp
 async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     raw = update.message.web_app_data.data
-    data = json.loads(raw)
-    dish = data.get("dish", "невідома страва")
-    await context.bot.send_message(chat_id=update.effective_chat.id, text=f"🍽️ Ви обрали: {dish}")
+    dish = json.loads(raw).get("dish", "невідома страва")
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=f"🍽️ Ви обрали: {dish}"
+    )
 
-# Регіструємо хендлери
 application.add_handler(CommandHandler("start", start))
 application.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_webapp_data))
 
-# ─── Запуск webhook + Flask ─────────────────────────────────────────────────
-if __name__ == "__main__":
-    # 1) Стартуємо Flask в окремому потоці, щоб віддавати /menu
-    threading.Thread(target=run_flask, daemon=True).start()
+# ─── aiohttp App ─────────────────────────────────────────────────────────────
+async def telegram_webhook(request):
+    data = await request.json()
+    update = Update.de_json(data, application.bot)
+    await application.process_update(update)
+    return web.Response(text="ok")
 
-    # 2) Стартуємо PTB-Webhook (цей виклик блокує основний потік)
-    application.run_webhook(
-        listen="0.0.0.0",
-        port=PORT,
-        url_path=TOKEN,                    # Telegram шле POST на /<TOKEN>
-        webhook_url=f"{WEBAPP_URL}/{TOKEN}"
-    )
+# Статика для вашого menu.html
+async def serve_menu(request):
+    return web.FileResponse(path="static/menu.html")
+
+app = web.Application()
+app.router.add_post(f"/{TOKEN}", telegram_webhook)
+app.router.add_get("/menu", serve_menu)
+
+# ─── Стартуємо все в одному процесі ──────────────────────────────────────────
+async def main():
+    # 1) Ініціалізуємо бота
+    await application.initialize()
+    # 2) Скидаємо старі апдейти і встановлюємо Webhook
+    await application.bot.set_webhook(f"{WEBAPP_URL}/{TOKEN}", drop_pending_updates=True)
+    print(f"📡 Webhook встановлено: {WEBAPP_URL}/{TOKEN}")
+    # 3) Запускаємо aiohttp-сервер (статик + webhook)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", PORT)
+    await site.start()
+    print(f"🌐 HTTP server запущено на порті {PORT}")
+    # і тримаємо цикл живим
+    await asyncio.Event().wait()
+
+if __name__ == "__main__":
+    asyncio.run(main())
