@@ -23,8 +23,12 @@ def serve_menu():
 
 @flask_app.route(f"/{TOKEN}", methods=["POST"])
 def telegram_webhook():
+    print("➡️  Получено POST на Webhook")               # Лог першого дотику
+    payload = request.get_json(force=True)
+    print("Payload:", payload)                          # Те, що прислало Telegram
     try:
-        update = Update.de_json(request.get_json(force=True), application.bot)
+        update = Update.de_json(payload, application.bot)
+        print("🆕 Update decoded:", update)             # Об’єкт Update
         application.create_task(application.process_update(update))
         return "ok"
     except Exception as e:
