@@ -22,18 +22,14 @@ def serve_menu():
     return send_from_directory("static", "menu.html")
 
 @flask_app.route(f"/{TOKEN}", methods=["POST"])
-def telegram_webhook():
-    print("➡️  Получено POST на Webhook")               # Лог першого дотику
-    payload = request.get_json(force=True)
-    print("Payload:", payload)                          # Те, що прислало Telegram
-    try:
-        update = Update.de_json(payload, application.bot)
-        print("🆕 Update decoded:", update)             # Об’єкт Update
-        application.create_task(application.process_update(update))
-        return "ok"
-    except Exception as e:
-        print("❌ Webhook Error:", e)
-        return "error", 500
+async def telegram_webhook():                        # <-- тепер async
+    print("➡️  POST на Webhook")
+    payload = await request.get_json(force=True)     # <-- await
+    print("Payload:", payload)
+    update = Update.de_json(payload, application.bot)
+    print("🆕 Update decoded:", update)
+    await application.process_update(update)         # <-- await
+    return "ok", 200
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
@@ -54,9 +50,11 @@ application.add_handler(CommandHandler("start", start))
 application.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_webapp_data))
 
 if __name__ == "__main__":
+    import asyncio
     async def main():
+        # встановлюємо webhook
         await application.bot.set_webhook(f"{WEBAPP_URL}/{TOKEN}")
         print(f"📡 Webhook встановлено: {WEBAPP_URL}/{TOKEN}")
+        # запускаємо Flask (async views підтримуються завдяки Flask[async])
         flask_app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
-
     asyncio.run(main())
