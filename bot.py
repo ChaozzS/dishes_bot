@@ -13,21 +13,21 @@ from telegram.ext import (
 from telegram.request import HTTPXRequest
 from dotenv import load_dotenv
 
-# ── Налаштування ──────────────────────────────────────────────────────────────
+# ── Завантажуємо налаштування ────────────────────────────────────────────────
 load_dotenv()
 TOKEN      = os.getenv("TELEGRAM_TOKEN")
-WEBAPP_URL = os.getenv("WEBAPP_URL")  # Наприклад: https://your-project.up.railway.app
+WEBAPP_URL = os.getenv("WEBAPP_URL")  # напр.: https://your-project.up.railway.app
 PORT       = int(os.environ.get("PORT", 8080))
 
-# ── HTTPXRequest для великого пулу з’єднань ────────────────────────────────────
+# ── HTTP-клієнт із більшим пулом з’єднань ────────────────────────────────────
 request = HTTPXRequest(
     connect_timeout=20.0,
     read_timeout=20.0,
-    pool_limits=(20, 20),
-    pool_timeout=30.0,
+    pool_timeout=30.0,   # скільки чекати вільного з’єднання
+    max_connections=20,  # скільки одночасних з’єднань дозволено
 )
 
-# ── Ініціалізація бота ─────────────────────────────────────────────────────────
+# ── Ініціалізуємо бот ─────────────────────────────────────────────────────────
 application = (
     ApplicationBuilder()
     .token(TOKEN)
@@ -64,11 +64,11 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
     except Exception as e:
         print("❌ Помилка в handle_webapp_data:", e)
 
-# ── Реєстрація хендлерів ───────────────────────────────────────────────────────
+# ── Реєструємо хендлери ───────────────────────────────────────────────────────
 application.add_handler(CommandHandler("start", start))
 application.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_webapp_data))
 
-# ── Запуск Webhook ────────────────────────────────────────────────────────────
+# ── Запускаємо Webhook ────────────────────────────────────────────────────────
 if __name__ == "__main__":
     application.run_webhook(
         listen="0.0.0.0",
