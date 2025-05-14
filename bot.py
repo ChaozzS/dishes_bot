@@ -27,9 +27,13 @@ def index():
 # Webhook точка прийому
 @flask_app.route(f"/{TOKEN}", methods=["POST"])
 def webhook():
-    update = Update.de_json(request.get_json(force=True), app.bot)
-    app.create_task(app.process_update(update))  # асинхронна обробка
-    return "ok", 200
+    try:
+        update = Update.de_json(request.get_json(force=True), app.bot)
+        app.create_task(app.process_update(update))  # запускає обробку асинхронно
+        return "ok", 200
+    except Exception as e:
+        print("❌ Помилка обробки webhook:", e)
+        return "error", 500
 
 # /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
